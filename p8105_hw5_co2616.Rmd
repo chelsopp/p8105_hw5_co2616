@@ -53,3 +53,20 @@ As number of people in a room increases, there is a greater probability that at 
 
 ## Problem 2
 
+```{r}
+null_df = function(n = 30, mu = 0, sigma = 2) {
+  
+ sim_df =
+  tibble(
+    x = rnorm(n = n, mean = mu, sd = sigma)
+    )
+ 
+ null_df %>% 
+    summarize(
+      mu_hat = mean(x),
+      sigma_hat = sd(x)
+    ) 
+
+}
+```
+
