@@ -55,7 +55,7 @@ As number of people in a room increases, there is a greater probability that at 
 ## Problem 2
 
 ```{r}
-null_df = function(n = 30, mu = 0, sigma = 5) {
+null_df = function(n, mu = 0, sigma = 5) {
   
  sim_df =
   tibble(
@@ -87,7 +87,7 @@ sim_results_df
 ```
 
 ```{r}
-new_null_df = function(n = 30, mu = 0, sigma = 5) {
+new_null_df = function(n, mu, sigma = 5) {
   
  new_sim_df =
   tibble(
@@ -109,11 +109,11 @@ new_null_df = function(n = 30, mu = 0, sigma = 5) {
 new_sim_results_df = 
   expand_grid(
     sample_size = 30,
-    new_mu = c(1,2,3,4,5,6),
-    iter = 1:5000
+    mu_list = c(1,2,3,4,5,6),
+    iter = 1:50
   ) |> 
   mutate(
-    new_estimate_df = map2(sample_size, new_mu, new_null_df)
+    new_estimate_df = map2(sample_size, mu_list, new_null_df)
   ) |> 
   unnest(new_estimate_df)
 
@@ -122,11 +122,11 @@ new_sim_results_df
 
 ```{r}
 new_sim_results_df %>%
-  group_by(new_mu) %>%
+  group_by(mu_list) %>%
   summarize(
     power = mean(new_p_val < 0.05)
   ) %>% 
-  ggplot(aes(x = new_mu, y = power)) +
+  ggplot(aes(x = mu_list, y = power)) +
   geom_line()
 ```
 
@@ -134,13 +134,20 @@ As effect size increases, the power increases and when the true mean is 4, you h
 
 ```{r}
 new_sim_results_df %>%
-  group_by(new_mu) %>%
+  group_by(mu_list) %>%
   filter(new_p_val < 0.05) %>% 
   summarize(
     avg_estimate = mean(new_estimate)
   ) %>% 
-  ggplot(aes(x = new_mu, y = avg_estimate)) +
+  ggplot(aes(x = mu_list, y = avg_estimate)) +
   geom_line()
 ```
 
-Yes, the sample average of 𝜇̂ across tests for which the null is rejected approximately equal to the true value of 𝜇 because
+Yes, as the effect size increase, the sample average of 𝜇̂ across tests for which the null is rejected approximately equal to the true value of 𝜇 because power increases.
+
+## Problem 3
+
+```{r}
+
+```
+
