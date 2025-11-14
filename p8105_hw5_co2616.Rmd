@@ -4,9 +4,11 @@ output: github_document
 date: "2025-11-14"
 ---
 
+loading key packages
 ```{r}
 library(tidyverse)
 library(broom)
+library(httr)
 ```
 
 ## Problem 1
@@ -23,19 +25,19 @@ bday_sim = function (n_room) {
 }
 ```
 
-running this function 10000 times for each group size between 2 and 50 and computing the average
+running this function 10000 times for each group size between 2 and 50 and computing the probability that at least two people in the group will share a birthday
 
 ```{r}
 bday_sim_results = 
   expand_grid(
-    room_size = 2:50,
-  iter = 1:1000
+    group_size = 2:50,
+    iter = 1:1000
   ) %>% 
   mutate(
-    results = map_lgl(room_size, bday_sim)
+    results = map_lgl(group_size, bday_sim)
   ) %>% 
   group_by(
-    room_size
+    group_size
   ) %>% 
   summarise(
     prob_repeat = mean(results)
@@ -43,14 +45,16 @@ bday_sim_results =
 ```
 
 plotting results
+
 ```{r}
 bday_sim_results %>% 
-  ggplot(aes(x = room_size, y = prob_repeat)) +
+  ggplot(aes(x = group_size, y = prob_repeat)) +
   geom_point() +
   geom_line()
+
 ```
 
-As number of people in a room increases, there is a greater probability that at least two people share a birthday. In a room full of about 25 people, there would be a 50% chance that at least two people share a birthday. n a room full of about 50 people, there would be a 99% chance that at least two people share a birthday. 
+As number of people in a room increases, there is a greater probability that at least two people share a birthday. In a room full of about 22 people, there would be around a 50% chance that at least two people share a birthday and in a room full of about 50 people, there would be about a 99% chance that at least two people share a birthday. 
 
 ## Problem 2
 
@@ -61,13 +65,12 @@ null_df = function(n, mu = 0, sigma = 5) {
   tibble(
     x = rnorm(n = n, mean = mu, sd = sigma)
     )
- 
+
  sim_df %>% 
     summarize(
-       estimate = tidy(t.test(x))$estimate,
-       p_val = tidy(t.test(x))$p.value
+       estimate = pull(tidy(t.test(x)), estimate),
+       p_val = pull(tidy(t.test(x)), p.value)
     ) 
-
 }
 
 ```
@@ -77,13 +80,11 @@ sim_results_df =
   expand_grid(
     sample_size = 30,
     iter = 1:5000
-  ) |> 
+  ) %>%  
   mutate(
     estimate_df = map(sample_size, null_df)
-  ) |> 
+  ) %>%  
   unnest(estimate_df)
-
-sim_results_df
 ```
 
 ```{r}
@@ -96,25 +97,25 @@ new_null_df = function(n, mu, sigma = 5) {
  
  new_sim_df %>% 
     summarize(
-       new_estimate = tidy(t.test(x))$estimate,
-       new_p_val = tidy(t.test(x))$p.value
+       new_estimate = pull(tidy(t.test(x)), estimate),
+       new_p_val = pull(tidy(t.test(x)), p.value)
     ) 
 
 }
 ```
 
-**Repeat the above for 𝜇={1,2,3,4,5,6}, and complete the following:**
+**Repeating the above for 𝜇={1,2,3,4,5,6}**
 
 ```{r}
 new_sim_results_df = 
   expand_grid(
     sample_size = 30,
     mu_list = c(1,2,3,4,5,6),
-    iter = 1:50
-  ) |> 
+    iter = 1:5000
+  ) %>%  
   mutate(
     new_estimate_df = map2(sample_size, mu_list, new_null_df)
-  ) |> 
+  ) %>%  
   unnest(new_estimate_df)
 
 new_sim_results_df
@@ -143,11 +144,69 @@ new_sim_results_df %>%
   geom_line()
 ```
 
-Yes, as the effect size increase, the sample average of 𝜇̂ across tests for which the null is rejected approximately equal to the true value of 𝜇 because power increases.
+Overall the no; however, as the effect size increases, the sample average of 𝜇̂ across tests for which the null is rejected approximately is equal to the true value of 𝜇 because power increases.
 
 ## Problem 3
 
 ```{r}
+homicide_df = 
+  read_csv("data/homicide-data.csv", na = c("NA", ".", "")) %>% 
+  janitor::clean_names() %>% 
+  unite("city_state", city, state, sep = ", " ) %>% 
+  group_by(city_state) %>% 
+  summarise(
+    total_homicides = n(),
+    unsol_homicides = sum(disposition %in% c("Close without arrest", "Open/No arrest"))
+    )
+```
 
+The `homicide_df` dataset has `r nrow(homicide_df)` observations and `r ncol(homicide_df)` variables and it shows the number of homicides across 50 large U.S. cities. This dataset contains key variables such as `victim_age` which shows the age of the victim of the homicide, `city` which shows the city in which the homicide occurred, and `dispostion` which tells us the outcome of the homicide. 
+
+```{r}
+baltimore = 
+  homicide_df %>%
+  filter(city_state == "Baltimore, MD")
+
+baltimore_test = 
+  prop.test(baltimore$unsol_homicides, baltimore$total_homicides)
+
+baltimore_test %>% 
+  broom::tidy() %>% 
+  select(estimate, conf.low, conf.high)
+```
+
+```{r}
+city_test = function(x, n) {
+  
+  prop.test(x = x, n = n)
+
+}
+
+```
+
+```{r}
+homicide_df_results = 
+  homicide_df %>% 
+  mutate(
+    data = map2(unsol_homicides, total_homicides, city_test),
+    results = map(data, broom::tidy)
+  ) %>% 
+  select(city_state, results) %>% 
+  unnest(results) %>% 
+  select(city_state, estimate, conf.low, conf.high)
+
+homicide_df_results
+```
+
+```{r}
+homicide_df_results %>%
+  mutate(
+    city_sate = fct_reorder(city_state, estimate)
+  ) %>% 
+  ggplot(aes(x = city_state, y = estimate)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.2, color = "steelblue") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 1))
+  
 ```
 
