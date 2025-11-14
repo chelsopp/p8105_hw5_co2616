@@ -162,6 +162,10 @@ homicide_df =
 
 The `homicide_df` dataset has `r nrow(homicide_df)` observations and `r ncol(homicide_df)` variables and it shows the number of homicides across 50 large U.S. cities. This dataset contains key variables such as `victim_age` which shows the age of the victim of the homicide, `city` which shows the city in which the homicide occurred, and `dispostion` which tells us the outcome of the homicide. 
 
+**Baltimore, MD**
+
+Running a `prop.test` for Baltimore, MD in my dataset and extracting both the proportion of unsolved homicides and the confidence interval.
+
 ```{r}
 baltimore = 
   homicide_df %>%
@@ -175,6 +179,10 @@ baltimore_test %>%
   select(estimate, conf.low, conf.high)
 ```
 
+**All Cities**
+
+Setting up a function to run a `prop.test` for each of the cities in my dataset.
+
 ```{r}
 city_test = function(x, n) {
   
@@ -183,6 +191,8 @@ city_test = function(x, n) {
 }
 
 ```
+
+Running a `prop.test` for each of the cities in my dataset and extracting both the proportion of unsolved homicides and the confidence interval for each.
 
 ```{r}
 homicide_df_results = 
@@ -198,10 +208,12 @@ homicide_df_results =
 homicide_df_results
 ```
 
+plotting results
+
 ```{r}
 homicide_df_results %>%
   mutate(
-    city_sate = fct_reorder(city_state, estimate)
+    city_state = fct_reorder(city_state, estimate)
   ) %>% 
   ggplot(aes(x = city_state, y = estimate)) +
   geom_point() +
