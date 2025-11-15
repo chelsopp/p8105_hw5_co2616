@@ -7,7 +7,6 @@ date: "2025-11-14"
 loading key packages
 ```{r}
 library(tidyverse)
-library(broom)
 library(httr)
 ```
 
@@ -65,12 +64,6 @@ null_df = function(n, mu = 0, sigma = 5) {
   tibble(
     x = rnorm(n = n, mean = mu, sd = sigma)
     )
-
- sim_df %>% 
-    summarize(
-       estimate = pull(tidy(t.test(x)), estimate),
-       p_val = pull(tidy(t.test(x)), p.value)
-    ) 
 }
 
 ```
@@ -82,10 +75,15 @@ sim_results_df =
     iter = 1:5000
   ) %>%  
   mutate(
-    estimate_df = map(sample_size, null_df)
+    sample = map(sample_size, null_df),
+    test = map(sample, t.test),
+    tidy = map(test, broom::tidy)
   ) %>%  
-  unnest(estimate_df)
+  unnest(tidy) %>% 
+  select(iter, sample_size, estimate, p.value)
 ```
+
+**Repeating the above for 𝜇={1,2,3,4,5,6}**
 
 ```{r}
 new_null_df = function(n, mu, sigma = 5) {
@@ -94,17 +92,8 @@ new_null_df = function(n, mu, sigma = 5) {
   tibble(
     x = rnorm(n = n, mean = mu, sd = sigma)
     )
- 
- new_sim_df %>% 
-    summarize(
-       new_estimate = pull(tidy(t.test(x)), estimate),
-       new_p_val = pull(tidy(t.test(x)), p.value)
-    ) 
-
 }
 ```
-
-**Repeating the above for 𝜇={1,2,3,4,5,6}**
 
 ```{r}
 new_sim_results_df = 
@@ -114,37 +103,48 @@ new_sim_results_df =
     iter = 1:5000
   ) %>%  
   mutate(
-    new_estimate_df = map2(sample_size, mu_list, new_null_df)
+    new_sample = map2(sample_size, mu_list, new_null_df),
+    new_test = map(new_sample, t.test),
+    new_tidy = map(new_test, broom::tidy)
   ) %>%  
-  unnest(new_estimate_df)
-
-new_sim_results_df
+  unnest(new_tidy) %>% 
+  select(iter, sample_size, mu_list, estimate, p.value)
 ```
 
 ```{r}
 new_sim_results_df %>%
   group_by(mu_list) %>%
   summarize(
-    power = mean(new_p_val < 0.05)
+    power = mean(p.value < 0.05)
   ) %>% 
   ggplot(aes(x = mu_list, y = power)) +
   geom_line()
 ```
+As effect size increases, the power increases and when the true mean is 4, you are reaching max power. 
 
-As effect size increases, the power increases and when the true mean is 4, you have reached max power. 
-
+A plot showing the average estimate of 𝜇̂ on the y axis and the true value of 𝜇 on the x axis.
 ```{r}
 new_sim_results_df %>%
   group_by(mu_list) %>%
-  filter(new_p_val < 0.05) %>% 
   summarize(
-    avg_estimate = mean(new_estimate)
+    avg_estimate = mean(estimate)
   ) %>% 
   ggplot(aes(x = mu_list, y = avg_estimate)) +
   geom_line()
 ```
 
-Overall the no; however, as the effect size increases, the sample average of 𝜇̂ across tests for which the null is rejected approximately is equal to the true value of 𝜇 because power increases.
+A plot showing the average estimate of 𝜇̂ only in samples for which the null was rejected on the y axis and the true value of 𝜇 on the x axis.
+```{r}
+new_sim_results_df %>%
+  group_by(mu_list) %>%
+  filter(p.value < 0.05) %>% 
+  summarize(
+    avg_estimate = mean(estimate)
+  ) %>% 
+  ggplot(aes(x = mu_list, y = avg_estimate)) +
+  geom_line()
+```
+Overall no. However, as the effect size increases, the sample average of 𝜇̂ across tests for which the null is rejected approximately is equal to the true value of 𝜇 because power increases.
 
 ## Problem 3
 
@@ -159,7 +159,6 @@ homicide_df =
     unsol_homicides = sum(disposition %in% c("Close without arrest", "Open/No arrest"))
     )
 ```
-
 The `homicide_df` dataset has `r nrow(homicide_df)` observations and `r ncol(homicide_df)` variables and it shows the number of homicides across 50 large U.S. cities. This dataset contains key variables such as `victim_age` which shows the age of the victim of the homicide, `city` which shows the city in which the homicide occurred, and `dispostion` which tells us the outcome of the homicide. 
 
 **Baltimore, MD**
